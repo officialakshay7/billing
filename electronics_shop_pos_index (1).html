@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Electronics Shop POS — Single File (Tailwind + Vanilla JS)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QR code generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- QR code scanner (uses device camera) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+  <style>
+    /* Small helpers for printable invoice */
+    @media print {
+      body * { visibility: hidden; }
+      #invoice, #invoice * { visibility: visible; }
+      #invoice { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div class="max-w-6xl mx-auto p-4">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold">Electronics Shop POS</h1>
+      <div class="text-sm text-slate-600">Amounts in <span class="font-semibold">INR (₹)</span></div>
+    </header>
+
+    <main class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Left: Item Management -->
+      <section class="md:col-span-2 bg-white rounded-lg p-4 shadow">
+        <h2 class="font-semibold mb-3">Add / Manage Items</h2>
+
+        <form id="itemForm" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+          <input required id="itemName" placeholder="Item name (e.g. Redmi Note 12)" class="p-2 border rounded" />
+          <input required id="itemPrice" placeholder="Price (₹)" type="number" min="0" step="0.01" class="p-2 border rounded" />
+          <input required id="itemStock" placeholder="Stock qty" type="number" min="0" step="1" class="p-2 border rounded" />
+          <input id="itemSKU" placeholder="SKU (leave blank to auto)" class="p-2 border rounded sm:col-span-1" />
+          <input id="itemDesc" placeholder="Short description" class="p-2 border rounded sm:col-span-2" />
+          <div class="sm:col-span-3 flex gap-2">
+            <button class="px-4 py-2 bg-blue-600 text-white rounded" id="addItemBtn">Add / Save Item</button>
+            <button type="button" id="clearForm" class="px-4 py-2 bg-gray-200 rounded">Clear</button>
+            <button type="button" id="exportBtn" class="px-4 py-2 bg-green-600 text-white rounded ml-auto">Export JSON</button>
+          </div>
+        </form>
+
+        <div class="mb-3 flex items-center justify-between">
+          <input id="search" placeholder="Search items by name or SKU" class="p-2 border rounded w-1/2" />
+          <div class="text-sm text-slate-500">Click item row to add to cart / manage stock / generate QR</div>
+        </div>
+
+        <div id="itemsList" class="overflow-auto max-h-96 border rounded p-2 bg-slate-50"></div>
+      </section>
+
+      <!-- Right: POS / Cart -->
+      <section class="bg-white rounded-lg p-4 shadow">
+        <h2 class="font-semibold mb-3">POS — Cart</h2>
+
+        <div class="mb-2">
+          <div class="flex gap-2">
+            <button id="openScanner" class="px-3 py-2 bg-indigo-600 text-white rounded">Scan QR (use Camera)</button>
+            <button id="stopScanner" class="px-3 py-2 bg-red-500 text-white rounded hidden">Stop Scanner</button>
+            <button id="viewSales" class="ml-auto px-3 py-2 bg-gray-200 rounded">View Sales</button>
+          </div>
+          <div id="qrScanner" class="mt-2"></div>
+          <div id="scannerMsg" class="text-xs text-slate-500 mt-2"></div>
+        </div>
+
+        <div id="cartArea" class="border rounded p-2 bg-slate-50">
+          <table class="w-full text-sm">
+            <thead class="text-left text-slate-600">
+              <tr><th>Item</th><th>Qty</th><th>Price</th><th>Sub</th><th></th></tr>
+            </thead>
+            <tbody id="cartBody"></tbody>
+          </table>
+
+          <div class="mt-3 space-y-2">
+            <div class="flex justify-between"><div>Subtotal</div><div id="subtotal">₹0.00</div></div>
+            <div class="flex justify-between items-center"><div>Discount (₹)</div><input id="discount" type="number" min="0" value="0" class="w-24 p-1 border rounded"/></div>
+            <div class="flex justify-between"><div>Total</div><div id="total">₹0.00</div></div>
+            <div class="flex gap-2">
+              <button id="checkoutBtn" class="px-4 py-2 bg-green-600 text-white rounded">Checkout & Generate Bill</button>
+              <button id="clearCart" class="px-4 py-2 bg-gray-200 rounded">Clear Cart</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modals and helpers -->
+    <div id="qrModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
+      <div class="bg-white p-4 rounded max-w-md w-full">
+        <h3 class="font-semibold">QR Code</h3>
+        <div id="qrcodeHolder" class="my-3 flex justify-center"></div>
+        <div class="flex justify-between items-center">
+          <div id="qrText" class="text-sm text-slate-600"></div>
+          <div class="text-right"><button id="downloadQr" class="px-3 py-1 bg-green-600 text-white rounded">Download</button> <button id="closeQrModal" class="px-3 py-1 bg-gray-200 rounded">Close</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="stockModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
+      <div class="bg-white p-4 rounded max-w-md w-full">
+        <h3 class="font-semibold">Update Stock</h3>
+        <div class="my-2">SKU: <span id="stockSKU"></span></div>
+        <div class="flex gap-2 items-center">
+          <input id="stockQty" type="number" min="0" value="0" class="p-2 border rounded" />
+          <button id="applyStock" class="px-3 py-2 bg-blue-600 text-white rounded">Apply (+)</button>
+        </div>
+        <div class="text-right mt-3"><button id="closeStockModal" class="px-3 py-1 bg-gray-200 rounded">Close</button></div>
+      </div>
+    </div>
+
+    <!-- Invoice area (hidden, printable) -->
+    <div id="invoice" class="hidden fixed inset-0 p-6 bg-white overflow-auto">
+      <div class="max-w-xl mx-auto">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h2 class="text-xl font-bold">Invoice</h2>
+            <div id="invShop">Electronics Shop</div>
+            <div id="invDate"></div>
+            <div id="invNo"></div>
+          </div>
+          <div id="invTotalAmt" class="text-right text-lg font-semibold"></div>
+        </div>
+        <table class="w-full mb-4 text-sm">
+          <thead class="text-left text-slate-600"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Sub</th></tr></thead>
+          <tbody id="invBody"></tbody>
+        </table>
+        <div class="text-right">Subtotal: <span id="invSub"></span></div>
+        <div class="text-right">Discount: <span id="invDisc"></span></div>
+        <div class="text-right text-lg font-bold">Total: <span id="invTotal"></span></div>
+        <div class="mt-6 flex gap-2 justify-end"><button id="printInv" class="px-3 py-2 bg-blue-600 text-white rounded">Print</button><button id="closeInv" class="px-3 py-2 bg-gray-200 rounded">Close</button></div>
+      </div>
+    </div>
+
+    <div id="salesModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+      <div class="bg-white p-4 rounded max-w-2xl w-full">
+        <h3 class="font-semibold">Sales History</h3>
+        <div id="salesList" class="max-h-96 overflow-auto mt-2"></div>
+        <div class="text-right mt-3"><button id="closeSales" class="px-3 py-1 bg-gray-200 rounded">Close</button></div>
+      </div>
+    </div>
+
+    <footer class="mt-6 text-slate-500 text-sm">Built with Tailwind + Vanilla JS — data saved locally in your browser (localStorage). Export/backup JSON to move between devices.</footer>
+  </div>
+
+<script>
+// ------------------ Simple POS App (Vanilla JS) with improved QR handling ------------------
+// Data is persisted in localStorage: 'pos_items', 'pos_sales'
+
+const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+
+let items = JSON.parse(localStorage.getItem('pos_items') || '[]');
+let sales = JSON.parse(localStorage.getItem('pos_sales') || '[]');
+let cart = [];
+let currentEditingSKU = null;
+let html5QrcodeScanner = null;
+let scannerActive = false;
+
+// Utils
+function saveItems() { localStorage.setItem('pos_items', JSON.stringify(items)); }
+function saveSales() { localStorage.setItem('pos_sales', JSON.stringify(sales)); }
+function genSKU(name) {
+  const base = name.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0,6) || 'ITEM';
+  return base + Date.now().toString().slice(-5);
+}
+function findItemBySKU(sku){ return items.find(i => i.sku === sku); }
+
+// Render functions
+function renderItems(filter=''){
+  const list = document.getElementById('itemsList');
+  list.innerHTML = '';
+  const filtered = items.filter(i => (i.name + ' ' + i.sku + ' ' + (i.desc||'')).toLowerCase().includes(filter.toLowerCase()));
+  if(filtered.length===0){ list.innerHTML = '<div class="p-3 text-slate-500">No items yet</div>'; return; }
+  filtered.forEach(i =>{
+    const row = document.createElement('div');
+    row.className = 'p-2 bg-white rounded mb-2 flex items-center justify-between shadow-sm';
+    row.innerHTML = `
+      <div>
+        <div class="font-semibold">${i.name} <span class="text-xs text-slate-500">[${i.sku}]</span></div>
+        <div class="text-sm text-slate-600">${i.desc || ''}</div>
+        <div class="text-sm text-slate-700 mt-1">Stock: <span class="font-semibold">${i.stock}</span> • Price: <span class="font-semibold">${fmt.format(i.price)}</span></div>
+      </div>
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex gap-1">
+          <button class="px-2 py-1 bg-indigo-600 text-white rounded" data-sku="${i.sku}" data-action="add">Add to Cart</button>
+          <button class="px-2 py-1 bg-yellow-400 text-white rounded" data-sku="${i.sku}" data-action="stock">+Stock</button>
+        </div>
+        <div class="flex gap-1 mt-1">
+          <button class="px-2 py-1 bg-gray-200 rounded" data-sku="${i.sku}" data-action="qr">QR</button>
+          <button class="px-2 py-1 bg-red-500 text-white rounded" data-sku="${i.sku}" data-action="del">Delete</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function renderCart(){
+  const body = document.getElementById('cartBody');
+  body.innerHTML='';
+  let subtotal = 0;
+  cart.forEach((c,idx)=>{
+    const tr = document.createElement('tr');
+    const sub = c.qty * c.price;
+    subtotal += sub;
+    tr.innerHTML = `
+      <td>${c.name}</td>
+      <td><input data-idx="${idx}" class="w-16 p-1 border rounded text-sm qtyInput" type="number" min="1" value="${c.qty}"/></td>
+      <td>${fmt.format(c.price)}</td>
+      <td>${fmt.format(sub)}</td>
+      <td><button data-idx="${idx}" class="px-2 py-1 bg-red-500 text-white rounded removeBtn">Remove</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  document.getElementById('subtotal').innerText = fmt.format(subtotal);
+  const discount = parseFloat(document.getElementById('discount').value || 0);
+  const total = Math.max(0, subtotal - discount);
+  document.getElementById('total').innerText = fmt.format(total);
+}
+
+// Add item form
+document.getElementById('itemForm').addEventListener('submit', e =>{
+  e.preventDefault();
+  const name = document.getElementById('itemName').value.trim();
+  const price = parseFloat(document.getElementById('itemPrice').value) || 0;
+  const stock = parseInt(document.getElementById('itemStock').value) || 0;
+  let sku = document.getElementById('itemSKU').value.trim();
+  const desc = document.getElementById('itemDesc').value.trim();
+  if(!sku) sku = genSKU(name);
+  const existing = findItemBySKU(sku);
+  if(currentEditingSKU){
+    const it = findItemBySKU(currentEditingSKU);
+    if(it){ it.name = name; it.price = price; it.stock = stock; it.desc = desc; it.sku = sku; }
+    currentEditingSKU = null;
+  } else {
+    if(existing){ alert('SKU already exists — change SKU'); return; }
+    items.push({ sku, name, price, stock, desc });
+  }
+  saveItems(); renderItems(); document.getElementById('itemForm').reset();
+});
+
+// Clear form
+document.getElementById('clearForm').addEventListener('click', ()=> document.getElementById('itemForm').reset());
+
+// Export JSON
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const data = { items, sales };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='pos-backup.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Search
+document.getElementById('search').addEventListener('input', e => renderItems(e.target.value));
+
+// Clicks on items list (delegation)
+document.getElementById('itemsList').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const action = btn.dataset.action; const sku = btn.dataset.sku;
+  if(action === 'add'){ addToCartBySKU(sku); }
+  else if(action === 'stock'){ openStockModal(sku); }
+  else if(action === 'qr'){ showQRForSKU(sku); }
+  else if(action === 'del'){ if(confirm('Delete item?')){ items = items.filter(i=>i.sku!==sku); saveItems(); renderItems(); } }
+});
+
+function addToCartBySKU(sku){ const it = findItemBySKU(sku); if(!it){ alert('Item not found'); return; } if(it.stock<=0){ alert('Out of stock'); return; }
+  const cartItem = cart.find(c=>c.sku===sku);
+  if(cartItem){ if(cartItem.qty+1 > it.stock){ alert('Not enough stock'); return; } cartItem.qty +=1; } else { cart.push({ sku: it.sku, name: it.name, price: it.price, qty: 1 }); }
+  renderCart(); }
+
+// Cart actions
+document.getElementById('cartArea').addEventListener('click', e=>{
+  if(e.target.classList.contains('removeBtn')){
+    const idx = parseInt(e.target.dataset.idx); cart.splice(idx,1); renderCart();
+  }
+});
+
+// Qty change
+document.addEventListener('input', e=>{
+  if(e.target.classList.contains('qtyInput')){
+    const idx = parseInt(e.target.dataset.idx); const v = parseInt(e.target.value)||1; const it = findItemBySKU(cart[idx].sku);
+    if(v>it.stock){ alert('Quantity exceeds stock'); e.target.value = it.stock; cart[idx].qty = it.stock; } else cart[idx].qty = v;
+    renderCart();
+  }
+  if(e.target.id==='discount') renderCart();
+});
+
+// Clear cart
+document.getElementById('clearCart').addEventListener('click', ()=>{ cart = []; renderCart(); });
+
+// Checkout
+document.getElementById('checkoutBtn').addEventListener('click', ()=>{
+  if(cart.length===0){ alert('Cart empty'); return; }
+  for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for ' + c.name); return; } }
+  const subtotal = cart.reduce((s,c)=>s + c.qty*c.price, 0);
+  const discount = parseFloat(document.getElementById('discount').value)||0;
+  const total = Math.max(0, subtotal - discount);
+  cart.forEach(c=>{ const it = findItemBySKU(c.sku); it.stock -= c.qty; });
+  saveItems();
+  const invNo = 'INV' + Date.now();
+  const sale = { invNo, date: new Date().toISOString(), items: JSON.parse(JSON.stringify(cart)), subtotal, discount, total };
+  sales.push(sale); saveSales();
+  showInvoice(sale);
+  cart = []; renderItems(); renderCart();
+});
+
+function showInvoice(sale){
+  document.getElementById('invoice').classList.remove('hidden');
+  document.getElementById('invDate').innerText = new Date(sale.date).toLocaleString();
+  document.getElementById('invNo').innerText = sale.invNo;
+  document.getElementById('invBody').innerHTML = '';
+  sale.items.forEach(it=>{
+    const tr = document.createElement('tr'); tr.innerHTML = `<td>${it.name}</td><td>${it.qty}</td><td>${fmt.format(it.price)}</td><td>${fmt.format(it.qty*it.price)}</td>`; document.getElementById('invBody').appendChild(tr);
+  });
+  document.getElementById('invSub').innerText = fmt.format(sale.subtotal);
+  document.getElementById('invDisc').innerText = fmt.format(sale.discount);
+  document.getElementById('invTotal').innerText = fmt.format(sale.total);
+  document.getElementById('invTotalAmt').innerText = fmt.format(sale.total);
+}
+
+document.getElementById('printInv').addEventListener('click', ()=>{ window.print(); });
+document.getElementById('closeInv').addEventListener('click', ()=>{ document.getElementById('invoice').classList.add('hidden'); });
+
+// Stock modal
+function openStockModal(sku){ document.getElementById('stockModal').classList.remove('hidden'); document.getElementById('stockSKU').innerText = sku; document.getElementById('stockQty').value = 1; currentEditingSKU = sku; }
+document.getElementById('closeStockModal').addEventListener('click', ()=>{ document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null; });
+document.getElementById('applyStock').addEventListener('click', ()=>{
+  const qty = parseInt(document.getElementById('stockQty').value)||0; const sku = currentEditingSKU; const it = findItemBySKU(sku);
+  if(!it) return; it.stock += qty; saveItems(); renderItems(); document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null;
+});
+
+// QR modal + generation
+function showQRForSKU(sku){
+  document.getElementById('qrModal').classList.remove('hidden');
+  const holder = document.getElementById('qrcodeHolder'); holder.innerHTML = '';
+  const payload = JSON.stringify({ type:'pos-item', sku });
+  const qDiv = document.createElement('div'); holder.appendChild(qDiv);
+  // create QR and wait a tick to allow DOM img render
+  const qr = new QRCode(qDiv, { text: payload, width: 220, height: 220 });
+  document.getElementById('qrText').innerText = payload;
+  // prepare download
+  setTimeout(()=>{
+    // qDiv will contain an <img> or a <canvas> depending on library
+    const img = qDiv.querySelector('img');
+    const canvas = qDiv.querySelector('canvas');
+    const downloadBtn = document.getElementById('downloadQr');
+    downloadBtn.onclick = ()=>{
+      try{
+        let url;
+        if(img) url = img.src;
+        else if(canvas) url = canvas.toDataURL('image/png');
+        else { alert('Unable to generate image'); return; }
+        const a = document.createElement('a'); a.href = url; a.download = sku + '.png'; document.body.appendChild(a); a.click(); a.remove();
+      }catch(err){ alert('Download failed: ' + err); }
+    };
+  },200);
+}
+document.getElementById('closeQrModal').addEventListener('click', ()=> document.getElementById('qrModal').classList.add('hidden'));
+
+// Improved Scanner (uses camera list when available)
+async function startScanner(){
+  if(scannerActive) return;
+  const scannerMsg = document.getElementById('scannerMsg');
+  scannerMsg.innerText = 'Starting camera...';
+  const container = document.getElementById('qrScanner'); container.innerHTML = '<div id="reader" style="width:100%"></div>';
+  try{
+    const cameras = await Html5Qrcode.getCameras();
+    if(!cameras || cameras.length===0){ scannerMsg.innerText = 'No camera found on this device.'; return; }
+    const cameraId = cameras[0].id; // default to first camera (usually rear)
+    html5QrcodeScanner = new Html5Qrcode('reader');
+    document.getElementById('stopScanner').classList.remove('hidden');
+    scannerActive = true;
+    await html5QrcodeScanner.start(
+      cameraId,
+      { fps: 10, qrbox: 250 },
+      qrCodeMessage => {
+        // On success
+        try{
+          // Try parse JSON payload first
+          let parsed = null;
+          try{ parsed = JSON.parse(qrCodeMessage); }catch(e){}
+          if(parsed && parsed.type==='pos-item' && parsed.sku){ addToCartBySKU(parsed.sku); }
+          else {
+            // try treat as SKU string
+            const possibleSKU = qrCodeMessage.trim();
+            const it = findItemBySKU(possibleSKU);
+            if(it) addToCartBySKU(possibleSKU);
+            else alert('Scanned: ' + qrCodeMessage + '\n(Scanned data did not match any item)');
+          }
+          stopScanner();
+        }catch(err){ console.error('Scan handling error', err); }
+      },
+      errorMessage => {
+        // optional error callback per scan frame
+        // console.log('scanErr', errorMessage);
+      }
+    );
+    scannerMsg.innerText = 'Scanning — point camera at item QR.';
+  }catch(err){ scannerMsg.innerText = 'Unable to start scanner: ' + err; console.error(err); }
+}
+
+async function stopScanner(){
+  const scannerMsg = document.getElementById('scannerMsg');
+  if(html5QrcodeScanner && scannerActive){
+    try{ await html5QrcodeScanner.stop(); html5QrcodeScanner.clear(); }catch(e){ console.warn('stop error', e); }
+  }
+  document.getElementById('qrScanner').innerHTML = '';
+  document.getElementById('stopScanner').classList.add('hidden');
+  scannerActive = false;
+  scannerMsg.innerText = '';
+}
+
+document.getElementById('openScanner').addEventListener('click', ()=>{ startScanner(); });
+document.getElementById('stopScanner').addEventListener('click', ()=>{ stopScanner(); });
+
+// Sales history
+document.getElementById('viewSales').addEventListener('click', ()=>{
+  document.getElementById('salesModal').classList.remove('hidden'); renderSales(); });
+document.getElementById('closeSales').addEventListener('click', ()=> document.getElementById('salesModal').classList.add('hidden'));
+function renderSales(){ const holder = document.getElementById('salesList'); holder.innerHTML=''; if(sales.length===0){ holder.innerHTML='<div class="p-3 text-slate-500">No sales yet</div>'; return; }
+  sales.slice().reverse().forEach(s=>{
+    const d = new Date(s.date);
+    const div = document.createElement('div'); div.className='p-2 border-b';
+    div.innerHTML = `<div class="flex justify-between"><div><strong>${s.invNo}</strong> • ${d.toLocaleString()}</div><div>${fmt.format(s.total)}</div></div>`;
+    const btn = document.createElement('button'); btn.className='mt-2 px-2 py-1 bg-gray-200 rounded'; btn.innerText='View'; btn.addEventListener('click', ()=> showInvoice(s));
+    div.appendChild(btn);
+    holder.appendChild(div);
+  });
+}
+
+// Load initial
+renderItems(); renderCart();
+
+// Allow scan stop on leaving
+window.addEventListener('beforeunload', ()=>{ if(html5QrcodeScanner && scannerActive) html5QrcodeScanner.stop().catch(()=>{}); });
+
+// Allow importing backup JSON
+window.addEventListener('dragover', e=> e.preventDefault());
+window.addEventListener('drop', e=>{
+  e.preventDefault(); const f = e.dataTransfer.files[0]; if(!f) return; const r = new FileReader(); r.onload = ()=>{
+    try{ const data = JSON.parse(r.result); if(data.items) items = data.items; if(data.sales) sales = data.sales; saveItems(); saveSales(); renderItems(); alert('Imported backup'); }catch(err){ alert('Invalid JSON'); }
+  }; r.readAsText(f);
+});
+
+</script>
+</body>
+</html>
