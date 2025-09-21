@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Electronics Shop POS — Invoice Template (Exact Design)</title>
+  <title>Electronics Shop POS — Invoice Template (Fixed)</title>
 
-  <!-- Tailwind (for admin UI only) -->
+  <!-- Tailwind (for admin UI) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- QR code generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <!-- QR code scanner -->
+  <!-- QR code scanner (jsDelivr) -->
 <!--   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script> -->
   <script src="qr.min.js"></script>
 
@@ -73,8 +73,8 @@
       margin-top: 8px;
     }
 
-    /* Small adjustments for visible invoice area in UI (not print) */
-    #invoice { display: none; }
+    /* small admin UI adjustments (no effect on print) */
+    .no-print { }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800">
@@ -156,7 +156,7 @@
       </section>
     </main>
 
-    <!-- QR Modal (no change) -->
+    <!-- QR Modal (no-print) -->
     <div id="qrModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center no-print">
       <div class="bg-white p-4 rounded max-w-md w-full">
         <h3 class="font-semibold">QR Code</h3>
@@ -168,7 +168,7 @@
       </div>
     </div>
 
-    <!-- Stock modal (no change) -->
+    <!-- Stock modal (no-print) -->
     <div id="stockModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center no-print">
       <div class="bg-white p-4 rounded max-w-md w-full">
         <h3 class="font-semibold">Update Stock</h3>
@@ -181,9 +181,16 @@
       </div>
     </div>
 
-    <!-- EXACT Invoice (matches image, no changes) -->
-    <div id="invoice">
+    <!-- EXACT Invoice -->
+    <!-- Note: initially hidden by inline style; JS will set display:block when showing invoice -->
+    <div id="invoice" style="display:none;">
       <div id="invoicePaper">
+
+        <!-- top control buttons (no-print) -->
+        <div class="flex justify-end mb-2 no-print">
+          <button id="printInv" class="px-3 py-1 bg-blue-600 text-white rounded mr-2">Print</button>
+          <button id="closeInv" class="px-3 py-1 bg-gray-200 rounded">Close</button>
+        </div>
 
         <!-- header: left proprietor, center shop title, right mobile -->
         <div class="flex justify-between items-start mb-2">
@@ -213,9 +220,7 @@
               <th class="col-amt">Amount</th>
             </tr>
           </thead>
-          <tbody id="invItemsBody">
-            <!-- JS will insert product rows and fill blank rows to preserve layout -->
-          </tbody>
+          <tbody id="invItemsBody"></tbody>
 
           <tfoot>
             <tr>
@@ -237,7 +242,7 @@
       </div>
     </div>
 
-    <!-- Sales modal (no change) -->
+    <!-- Sales modal (no-print) -->
     <div id="salesModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center no-print">
       <div class="bg-white p-4 rounded max-w-2xl w-full">
         <h3 class="font-semibold">Sales History</h3>
@@ -250,7 +255,7 @@
   </div>
 
 <script>
-/* ------------------ POS JavaScript (exact invoice design preserved) ------------------ */
+/* ------------------ POS JavaScript (fixed invoice visibility) ------------------ */
 const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
 let items = JSON.parse(localStorage.getItem('pos_items') || '[]');
@@ -260,13 +265,12 @@ let currentEditingSKU = null;
 let html5QrcodeScanner = null;
 let scannerActive = false;
 
-/* Persistence helpers */
 function saveItems(){ localStorage.setItem('pos_items', JSON.stringify(items)); }
 function saveSales(){ localStorage.setItem('pos_sales', JSON.stringify(sales)); }
 function genSKU(name){ const base = name.replace(/[^a-z0-9]/gi,'').toUpperCase().slice(0,6) || 'ITEM'; return base + Date.now().toString().slice(-5); }
 function findItemBySKU(sku){ return items.find(i=> i.sku===sku); }
 
-/* Render items (left panel) */
+/* Render left items */
 function renderItems(filter=''){
   const list = document.getElementById('itemsList'); list.innerHTML='';
   const filtered = items.filter(i => (i.name + ' ' + i.sku + ' ' + (i.desc||'')).toLowerCase().includes(filter.toLowerCase()));
@@ -294,7 +298,7 @@ function renderItems(filter=''){
   });
 }
 
-/* Cart rendering */
+/* Render cart */
 function renderCart(){
   const body = document.getElementById('cartBody'); body.innerHTML='';
   let subtotal = 0;
@@ -315,7 +319,7 @@ function renderCart(){
   document.getElementById('total').innerText = fmt.format(total);
 }
 
-/* Add item */
+/* Add item form */
 document.getElementById('itemForm').addEventListener('submit', e=>{
   e.preventDefault();
   const name = document.getElementById('itemName').value.trim();
@@ -342,7 +346,7 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
 });
 document.getElementById('search').addEventListener('input', e=> renderItems(e.target.value));
 
-/* Items actions (delegation) */
+/* Item actions */
 document.getElementById('itemsList').addEventListener('click', e=>{
   const btn = e.target.closest('button'); if(!btn) return;
   const action = btn.dataset.action; const sku = btn.dataset.sku;
@@ -352,7 +356,6 @@ document.getElementById('itemsList').addEventListener('click', e=>{
   else if(action==='del'){ if(confirm('Delete item?')){ items = items.filter(i=>i.sku!==sku); saveItems(); renderItems(); } }
 });
 
-/* Add to cart function */
 function addToCartBySKU(sku){
   const it = findItemBySKU(sku);
   if(!it){ alert('Item not found'); return; }
@@ -378,14 +381,13 @@ document.addEventListener('input', e=>{
 });
 document.getElementById('clearCart').addEventListener('click', ()=>{ cart = []; renderCart(); });
 
-/* Checkout: record sale, reduce stock, show invoice (exact design) */
+/* Checkout and invoice (works reliably now) */
 document.getElementById('checkoutBtn').addEventListener('click', ()=>{
   if(cart.length===0){ alert('Cart empty'); return; }
   for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for ' + c.name); return; } }
   const subtotal = cart.reduce((s,c)=>s + c.qty*c.price, 0);
   const discount = parseFloat(document.getElementById('discount').value)||0;
   const total = Math.max(0, subtotal - discount);
-
   const cust = { name: (document.getElementById('custName').value || '').trim(), phone: (document.getElementById('custPhone').value || '').trim(), address: (document.getElementById('custAddress').value || '').trim() };
 
   // reduce stock
@@ -396,32 +398,29 @@ document.getElementById('checkoutBtn').addEventListener('click', ()=>{
   const sale = { invNo, date: new Date().toISOString(), items: JSON.parse(JSON.stringify(cart)), subtotal, discount, total, customer: cust };
   sales.push(sale); saveSales();
 
+  // show invoice
   showInvoice(sale);
 
+  // clear cart & inputs
   cart = []; renderItems(); renderCart();
-
-  // clear customer inputs
   document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value='';
 });
 
-/* Invoice rendering — EXACT design preserved
-   Fills fixed rows to keep printed layout identical.
-*/
+/* Invoice rendering */
 function showInvoice(sale){
-  // header fields (left/proprietor and right/mobile left blank as in the design)
-  document.getElementById('shopOwnerLeft').innerText = ''; // leave blank or set proprietor
-  document.getElementById('shopMobileRight').innerText = ''; // leave blank or set mobile
-  // shop center fixed lines (match image)
+  // set header text exactly like design (user may customize later)
   document.getElementById('invShopName').innerText = 'COMPUTER & ELECTRONICS';
   document.getElementById('invShopDesc').innerText = 'Deals in: Mobile, Mobile Accessories & Electrical Appliances';
   document.getElementById('invShopAddr').innerText = 'Near XYZ, Someplace (BIHAR)';
+  document.getElementById('shopOwnerLeft').innerText = ''; // left blank per provided design
+  document.getElementById('shopMobileRight').innerText = ''; // blank
 
   const cust = sale.customer || {};
   document.getElementById('printCustName').innerText = cust.name || '__________';
   document.getElementById('printDate').innerText = (new Date(sale.date)).toLocaleString();
 
-  // invoice rows
-  const tbody = document.getElementById('invItemsBody'); tbody.innerHTML = '';
+  // populate table with fixed rows
+  const tbody = document.getElementById('invItemsBody'); tbody.innerHTML='';
   const FIXED_ROWS = 12;
   let idx = 0;
   for(const it of sale.items){
@@ -451,16 +450,22 @@ function showInvoice(sale){
   document.getElementById('invGrandTotal').innerText = fmt.format(sale.total);
   document.getElementById('invNo').innerText = sale.invNo;
 
-  // show invoice container (visible for print)
+  // show invoice (now works because not forced-hidden by CSS)
   document.getElementById('invoice').style.display = 'block';
-  // scroll invoice into view (optional)
+  // scroll to top so invoice is visible
   setTimeout(()=> window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
 }
 
-/* close invoice: hide it (print button is browser) */
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ document.getElementById('invoice').style.display='none'; } });
+/* Print and close controls */
+document.getElementById('printInv').addEventListener('click', ()=>{
+  // print only invoice via @media print rules
+  window.print();
+});
+document.getElementById('closeInv').addEventListener('click', ()=>{
+  document.getElementById('invoice').style.display = 'none';
+});
 
-/* Stock modal logic */
+/* Stock modal */
 function openStockModal(sku){ document.getElementById('stockModal').classList.remove('hidden'); document.getElementById('stockSKU').innerText = sku; document.getElementById('stockQty').value = 1; currentEditingSKU = sku; }
 document.getElementById('closeStockModal').addEventListener('click', ()=>{ document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null; });
 document.getElementById('applyStock').addEventListener('click', ()=>{
@@ -547,10 +552,10 @@ function renderSales(){
   });
 }
 
-/* Utility: escape HTML */
+/* Utility escapeHtml */
 function escapeHtml(str){ if(!str) return ''; return String(str).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; }); }
 
-/* Init render */
+/* Init */
 renderItems(); renderCart();
 
 /* Cleanup */
@@ -567,4 +572,3 @@ window.addEventListener('drop', e=>{
 
 </body>
 </html>
-
