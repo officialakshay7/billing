@@ -4,16 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Electronics Shop POS — Single File (Tailwind + Vanilla JS)</title>
-  <!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
 
-<!-- QR code generator -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- QR code scanner -->
-<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+  <!-- QR code generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- QR code scanner (loads Html5Qrcode globally) -->
+  <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+
   <style>
-    /* Small helpers for printable invoice */
+    /* Printable invoice helpers */
     @media print {
       body * { visibility: hidden; }
       #invoice, #invoice * { visibility: visible; }
@@ -148,9 +150,8 @@
   </div>
 
 <script>
-// ------------------ Simple POS App (Vanilla JS) with improved QR handling ------------------
-// Data is persisted in localStorage: 'pos_items', 'pos_sales'
-
+/* ------------------ POS JavaScript (complete) ------------------ */
+/* Data keys: pos_items, pos_sales */
 const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
 let items = JSON.parse(localStorage.getItem('pos_items') || '[]');
@@ -160,7 +161,6 @@ let currentEditingSKU = null;
 let html5QrcodeScanner = null;
 let scannerActive = false;
 
-// Utils
 function saveItems() { localStorage.setItem('pos_items', JSON.stringify(items)); }
 function saveSales() { localStorage.setItem('pos_sales', JSON.stringify(sales)); }
 function genSKU(name) {
@@ -169,7 +169,7 @@ function genSKU(name) {
 }
 function findItemBySKU(sku){ return items.find(i => i.sku === sku); }
 
-// Render functions
+/* Rendering */
 function renderItems(filter=''){
   const list = document.getElementById('itemsList');
   list.innerHTML = '';
@@ -222,7 +222,7 @@ function renderCart(){
   document.getElementById('total').innerText = fmt.format(total);
 }
 
-// Add item form
+/* Add item */
 document.getElementById('itemForm').addEventListener('submit', e =>{
   e.preventDefault();
   const name = document.getElementById('itemName').value.trim();
@@ -243,10 +243,9 @@ document.getElementById('itemForm').addEventListener('submit', e =>{
   saveItems(); renderItems(); document.getElementById('itemForm').reset();
 });
 
-// Clear form
 document.getElementById('clearForm').addEventListener('click', ()=> document.getElementById('itemForm').reset());
 
-// Export JSON
+/* Export JSON */
 document.getElementById('exportBtn').addEventListener('click', ()=>{
   const data = { items, sales };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -255,10 +254,10 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   URL.revokeObjectURL(url);
 });
 
-// Search
+/* Search */
 document.getElementById('search').addEventListener('input', e => renderItems(e.target.value));
 
-// Clicks on items list (delegation)
+/* Item list buttons (delegation) */
 document.getElementById('itemsList').addEventListener('click', e=>{
   const btn = e.target.closest('button'); if(!btn) return;
   const action = btn.dataset.action; const sku = btn.dataset.sku;
@@ -273,14 +272,14 @@ function addToCartBySKU(sku){ const it = findItemBySKU(sku); if(!it){ alert('Ite
   if(cartItem){ if(cartItem.qty+1 > it.stock){ alert('Not enough stock'); return; } cartItem.qty +=1; } else { cart.push({ sku: it.sku, name: it.name, price: it.price, qty: 1 }); }
   renderCart(); }
 
-// Cart actions
+/* Cart actions */
 document.getElementById('cartArea').addEventListener('click', e=>{
   if(e.target.classList.contains('removeBtn')){
     const idx = parseInt(e.target.dataset.idx); cart.splice(idx,1); renderCart();
   }
 });
 
-// Qty change
+/* Quantity change and discount */
 document.addEventListener('input', e=>{
   if(e.target.classList.contains('qtyInput')){
     const idx = parseInt(e.target.dataset.idx); const v = parseInt(e.target.value)||1; const it = findItemBySKU(cart[idx].sku);
@@ -290,10 +289,10 @@ document.addEventListener('input', e=>{
   if(e.target.id==='discount') renderCart();
 });
 
-// Clear cart
+/* Clear cart */
 document.getElementById('clearCart').addEventListener('click', ()=>{ cart = []; renderCart(); });
 
-// Checkout
+/* Checkout */
 document.getElementById('checkoutBtn').addEventListener('click', ()=>{
   if(cart.length===0){ alert('Cart empty'); return; }
   for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for ' + c.name); return; } }
@@ -326,7 +325,7 @@ function showInvoice(sale){
 document.getElementById('printInv').addEventListener('click', ()=>{ window.print(); });
 document.getElementById('closeInv').addEventListener('click', ()=>{ document.getElementById('invoice').classList.add('hidden'); });
 
-// Stock modal
+/* Stock modal */
 function openStockModal(sku){ document.getElementById('stockModal').classList.remove('hidden'); document.getElementById('stockSKU').innerText = sku; document.getElementById('stockQty').value = 1; currentEditingSKU = sku; }
 document.getElementById('closeStockModal').addEventListener('click', ()=>{ document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null; });
 document.getElementById('applyStock').addEventListener('click', ()=>{
@@ -334,18 +333,15 @@ document.getElementById('applyStock').addEventListener('click', ()=>{
   if(!it) return; it.stock += qty; saveItems(); renderItems(); document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null;
 });
 
-// QR modal + generation
+/* QR generation */
 function showQRForSKU(sku){
   document.getElementById('qrModal').classList.remove('hidden');
   const holder = document.getElementById('qrcodeHolder'); holder.innerHTML = '';
   const payload = JSON.stringify({ type:'pos-item', sku });
   const qDiv = document.createElement('div'); holder.appendChild(qDiv);
-  // create QR and wait a tick to allow DOM img render
-  const qr = new QRCode(qDiv, { text: payload, width: 220, height: 220 });
+  new QRCode(qDiv, { text: payload, width: 220, height: 220 });
   document.getElementById('qrText').innerText = payload;
-  // prepare download
   setTimeout(()=>{
-    // qDiv will contain an <img> or a <canvas> depending on library
     const img = qDiv.querySelector('img');
     const canvas = qDiv.querySelector('canvas');
     const downloadBtn = document.getElementById('downloadQr');
@@ -362,31 +358,37 @@ function showQRForSKU(sku){
 }
 document.getElementById('closeQrModal').addEventListener('click', ()=> document.getElementById('qrModal').classList.add('hidden'));
 
-// Improved Scanner (uses camera list when available)
+/* Improved Scanner (Html5Qrcode) */
 async function startScanner(){
   if(scannerActive) return;
   const scannerMsg = document.getElementById('scannerMsg');
   scannerMsg.innerText = 'Starting camera...';
   const container = document.getElementById('qrScanner'); container.innerHTML = '<div id="reader" style="width:100%"></div>';
   try{
+    // Ensure Html5Qrcode is available
+    if(typeof Html5Qrcode === 'undefined'){ scannerMsg.innerText = 'Scanner library not loaded.'; console.error('Html5Qrcode not defined'); return; }
+
     const cameras = await Html5Qrcode.getCameras();
     if(!cameras || cameras.length===0){ scannerMsg.innerText = 'No camera found on this device.'; return; }
-    const cameraId = cameras[0].id; // default to first camera (usually rear)
+    // prefer a rear camera if available
+    let cameraId = cameras[0].id;
+    const rear = cameras.find(c => /back|rear|environment/i.test(c.label || ''));
+    if(rear) cameraId = rear.id;
+
     html5QrcodeScanner = new Html5Qrcode('reader');
     document.getElementById('stopScanner').classList.remove('hidden');
     scannerActive = true;
+
     await html5QrcodeScanner.start(
       cameraId,
       { fps: 10, qrbox: 250 },
       qrCodeMessage => {
-        // On success
+        // handle successful scan
         try{
-          // Try parse JSON payload first
           let parsed = null;
           try{ parsed = JSON.parse(qrCodeMessage); }catch(e){}
           if(parsed && parsed.type==='pos-item' && parsed.sku){ addToCartBySKU(parsed.sku); }
           else {
-            // try treat as SKU string
             const possibleSKU = qrCodeMessage.trim();
             const it = findItemBySKU(possibleSKU);
             if(it) addToCartBySKU(possibleSKU);
@@ -396,12 +398,14 @@ async function startScanner(){
         }catch(err){ console.error('Scan handling error', err); }
       },
       errorMessage => {
-        // optional error callback per scan frame
-        // console.log('scanErr', errorMessage);
+        // per-frame scan error (ignored)
       }
     );
     scannerMsg.innerText = 'Scanning — point camera at item QR.';
-  }catch(err){ scannerMsg.innerText = 'Unable to start scanner: ' + err; console.error(err); }
+  }catch(err){
+    scannerMsg.innerText = 'Unable to start scanner: ' + err;
+    console.error(err);
+  }
 }
 
 async function stopScanner(){
@@ -418,7 +422,7 @@ async function stopScanner(){
 document.getElementById('openScanner').addEventListener('click', ()=>{ startScanner(); });
 document.getElementById('stopScanner').addEventListener('click', ()=>{ stopScanner(); });
 
-// Sales history
+/* Sales history */
 document.getElementById('viewSales').addEventListener('click', ()=>{
   document.getElementById('salesModal').classList.remove('hidden'); renderSales(); });
 document.getElementById('closeSales').addEventListener('click', ()=> document.getElementById('salesModal').classList.add('hidden'));
@@ -433,20 +437,19 @@ function renderSales(){ const holder = document.getElementById('salesList'); hol
   });
 }
 
-// Load initial
+/* Init */
 renderItems(); renderCart();
 
-// Allow scan stop on leaving
+/* Cleanup on unload */
 window.addEventListener('beforeunload', ()=>{ if(html5QrcodeScanner && scannerActive) html5QrcodeScanner.stop().catch(()=>{}); });
 
-// Allow importing backup JSON
+/* Drag & drop import */
 window.addEventListener('dragover', e=> e.preventDefault());
 window.addEventListener('drop', e=>{
   e.preventDefault(); const f = e.dataTransfer.files[0]; if(!f) return; const r = new FileReader(); r.onload = ()=>{
     try{ const data = JSON.parse(r.result); if(data.items) items = data.items; if(data.sales) sales = data.sales; saveItems(); saveSales(); renderItems(); alert('Imported backup'); }catch(err){ alert('Invalid JSON'); }
   }; r.readAsText(f);
 });
-
 </script>
 </body>
 </html>
