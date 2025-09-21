@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Electronics Shop POS — Invoice Template</title>
+  <title>Electronics Shop POS — Invoice Template (Exact Design)</title>
 
-  <!-- Tailwind -->
+  <!-- Tailwind (for admin UI only) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- QR code generator -->
@@ -16,7 +16,7 @@
   <script src="qr.min.js"></script>
 
   <style>
-    /* Print layout tuned to match provided design */
+    /* Print layout tuned to match provided design (no changes) */
     @media print {
       body * { visibility: hidden; }
       #invoice, #invoice * { visibility: visible; }
@@ -24,20 +24,21 @@
       .no-print { display: none !important; }
     }
 
-    /* Invoice page style (desktop view inside app) */
+    /* Invoice paper to closely match the image */
     #invoicePaper {
-      width: 800px;            /* approximate fixed width similar to your image */
+      width: 800px;
       margin: 0 auto;
-      border: 1px solid #111;
-      padding: 12px;
+      border: 1px solid #000;
+      padding: 8px;
       background: #fff;
       box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
     }
 
-    /* thin grid lines like the example */
+    /* Table and borders like the sample */
     .inv-table td, .inv-table th {
-      border: 1px solid #111;
-      padding: 6px;
+      border: 1px solid #000;
+      padding: 6px 8px;
       vertical-align: top;
       font-size: 13px;
     }
@@ -46,6 +47,7 @@
       width: 100%;
       table-layout: fixed;
     }
+
     .inv-header-title {
       font-weight: 800;
       font-size: 20px;
@@ -53,35 +55,39 @@
     }
     .inv-shop-sub {
       font-size: 12px;
-      color: #333;
+      color: #111;
     }
 
-    /* Sizing for columns (to mimic the image proportions) */
+    /* Columns sized to match image proportions */
     .col-sno { width: 6%; text-align:center; }
     .col-part { width: 58%; }
     .col-qty { width: 12%; text-align:center; }
     .col-rate { width: 12%; text-align:right; padding-right:10px; }
     .col-amt { width: 12%; text-align:right; padding-right:10px; }
 
-    /* footer box */
+    /* Footer box style */
     .inv-footer-box {
-      border: 1px solid #111;
+      border: 1px solid #000;
       padding: 8px;
       font-size: 12px;
       margin-top: 8px;
     }
+
+    /* Small adjustments for visible invoice area in UI (not print) */
+    #invoice { display: none; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800">
 
   <div class="max-w-6xl mx-auto p-4">
 
-    <header class="flex items-center justify-between mb-6">
+    <!-- ADMIN UI (no-print) -->
+    <header class="flex items-center justify-between mb-6 no-print">
       <h1 class="text-2xl font-bold">Electronics Shop POS</h1>
       <div class="text-sm text-slate-600">Amounts in <span class="font-semibold">INR (₹)</span></div>
     </header>
 
-    <main class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <main class="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
       <!-- Left: Item Management -->
       <section class="md:col-span-2 bg-white rounded-lg p-4 shadow">
         <h2 class="font-semibold mb-3">Add / Manage Items</h2>
@@ -120,7 +126,7 @@
           <div id="qrScanner" class="mt-2"></div>
           <div id="scannerMsg" class="text-xs text-slate-500 mt-2"></div>
 
-          <!-- Customer fields for bill -->
+          <!-- Customer fields (optional) -->
           <div class="border rounded p-2 bg-slate-50">
             <div class="text-sm font-semibold mb-2">Customer details (optional)</div>
             <input id="custName" placeholder="Customer name" class="w-full p-2 border rounded mb-2" />
@@ -150,8 +156,8 @@
       </section>
     </main>
 
-    <!-- QR modal -->
-    <div id="qrModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
+    <!-- QR Modal (no change) -->
+    <div id="qrModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center no-print">
       <div class="bg-white p-4 rounded max-w-md w-full">
         <h3 class="font-semibold">QR Code</h3>
         <div id="qrcodeHolder" class="my-3 flex justify-center"></div>
@@ -162,8 +168,8 @@
       </div>
     </div>
 
-    <!-- Stock modal -->
-    <div id="stockModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
+    <!-- Stock modal (no change) -->
+    <div id="stockModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center no-print">
       <div class="bg-white p-4 rounded max-w-md w-full">
         <h3 class="font-semibold">Update Stock</h3>
         <div class="my-2">SKU: <span id="stockSKU"></span></div>
@@ -175,29 +181,29 @@
       </div>
     </div>
 
-    <!-- Invoice (matches provided design) -->
-    <div id="invoice" class="hidden fixed inset-0 p-6 bg-white overflow-auto">
-      <div id="invoicePaper" class="mx-auto">
+    <!-- EXACT Invoice (matches image, no changes) -->
+    <div id="invoice">
+      <div id="invoicePaper">
 
-        <!-- header: left contact, center shop title, right mobile -->
+        <!-- header: left proprietor, center shop title, right mobile -->
         <div class="flex justify-between items-start mb-2">
-          <div style="width:33%; font-size:12px;">Prop: <span id="shopOwnerLeft">-</span></div>
+          <div style="width:33%; font-size:12px;">Prop: <span id="shopOwnerLeft">__________</span></div>
           <div style="width:34%; text-align:center;">
             <div class="inv-header-title" id="invShopName">COMPUTER & ELECTRONICS</div>
             <div class="inv-shop-sub" id="invShopDesc">Deals in: Mobile, Mobile Accessories & Electrical Appliances</div>
             <div class="inv-shop-sub" id="invShopAddr">Near XYZ, Someplace (BIHAR)</div>
           </div>
-          <div style="width:33%; text-align:right; font-size:12px;">Mob: <span id="shopMobileRight">-</span></div>
+          <div style="width:33%; text-align:right; font-size:12px;">Mob: <span id="shopMobileRight">__________</span></div>
         </div>
 
-        <!-- Name and Date row -->
+        <!-- Name and Date row (blank lines as in design) -->
         <div class="flex justify-between items-center mb-2">
           <div style="width:65%;"><strong>Name</strong> &nbsp; <span id="printCustName">__________</span></div>
           <div style="width:35%; text-align:right;"><strong>Date</strong> &nbsp; <span id="printDate">__________</span></div>
         </div>
 
-        <!-- Items table -->
-        <table class="inv-table mb-2">
+        <!-- Items table: S.No | Particulars | Qnty | Rate | Amount -->
+        <table class="inv-table mb-2" aria-hidden="false">
           <thead>
             <tr>
               <th class="col-sno">S.No</th>
@@ -208,10 +214,9 @@
             </tr>
           </thead>
           <tbody id="invItemsBody">
-            <!-- rows added by JS -->
+            <!-- JS will insert product rows and fill blank rows to preserve layout -->
           </tbody>
 
-          <!-- total row with separate border -->
           <tfoot>
             <tr>
               <td colspan="4" style="text-align:center; font-weight:700; padding:10px;">TOTAL</td>
@@ -220,20 +225,20 @@
           </tfoot>
         </table>
 
-        <!-- footer notes -->
+        <!-- footer: exact 3 lines of Hindi text -->
         <div class="inv-footer-box">
           <ol style="padding-left:16px; margin:0;">
             <li>हैण्डसेट की गारंटी सर्विस सेंटर से ही मिलेगी।</li>
             <li>विक्रय पर्ची के बिना समान की कोई जमानत/गैर ज़िम्मेदारी नहीं होगी।</li>
-            <li>बिक्री हुआ समान वापस नहीं होगा।</li>
+            <li>बिक्री हुआ सामान वापस नहीं होगा।</li>
           </ol>
         </div>
 
       </div>
     </div>
 
-    <!-- Sales modal -->
-    <div id="salesModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+    <!-- Sales modal (no change) -->
+    <div id="salesModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center no-print">
       <div class="bg-white p-4 rounded max-w-2xl w-full">
         <h3 class="font-semibold">Sales History</h3>
         <div id="salesList" class="max-h-96 overflow-auto mt-2"></div>
@@ -245,7 +250,7 @@
   </div>
 
 <script>
-/* ------------------ POS JavaScript (invoice layout) ------------------ */
+/* ------------------ POS JavaScript (exact invoice design preserved) ------------------ */
 const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
 let items = JSON.parse(localStorage.getItem('pos_items') || '[]');
@@ -255,16 +260,13 @@ let currentEditingSKU = null;
 let html5QrcodeScanner = null;
 let scannerActive = false;
 
-/* Helpers */
+/* Persistence helpers */
 function saveItems(){ localStorage.setItem('pos_items', JSON.stringify(items)); }
 function saveSales(){ localStorage.setItem('pos_sales', JSON.stringify(sales)); }
-function genSKU(name){
-  const base = name.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0,6) || 'ITEM';
-  return base + Date.now().toString().slice(-5);
-}
+function genSKU(name){ const base = name.replace(/[^a-z0-9]/gi,'').toUpperCase().slice(0,6) || 'ITEM'; return base + Date.now().toString().slice(-5); }
 function findItemBySKU(sku){ return items.find(i=> i.sku===sku); }
 
-/* Render items list in left panel */
+/* Render items (left panel) */
 function renderItems(filter=''){
   const list = document.getElementById('itemsList'); list.innerHTML='';
   const filtered = items.filter(i => (i.name + ' ' + i.sku + ' ' + (i.desc||'')).toLowerCase().includes(filter.toLowerCase()));
@@ -313,7 +315,7 @@ function renderCart(){
   document.getElementById('total').innerText = fmt.format(total);
 }
 
-/* Add item form */
+/* Add item */
 document.getElementById('itemForm').addEventListener('submit', e=>{
   e.preventDefault();
   const name = document.getElementById('itemName').value.trim();
@@ -333,18 +335,14 @@ document.getElementById('itemForm').addEventListener('submit', e=>{
   }
   saveItems(); renderItems(); document.getElementById('itemForm').reset();
 });
-
 document.getElementById('clearForm').addEventListener('click', ()=> document.getElementById('itemForm').reset());
 document.getElementById('exportBtn').addEventListener('click', ()=>{
-  const data = { items, sales };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='pos-backup.json'; a.click();
-  URL.revokeObjectURL(url);
+  const data = { items, sales }; const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='pos-backup.json'; a.click(); URL.revokeObjectURL(url);
 });
 document.getElementById('search').addEventListener('input', e=> renderItems(e.target.value));
 
-/* Items list delegation */
+/* Items actions (delegation) */
 document.getElementById('itemsList').addEventListener('click', e=>{
   const btn = e.target.closest('button'); if(!btn) return;
   const action = btn.dataset.action; const sku = btn.dataset.sku;
@@ -354,22 +352,17 @@ document.getElementById('itemsList').addEventListener('click', e=>{
   else if(action==='del'){ if(confirm('Delete item?')){ items = items.filter(i=>i.sku!==sku); saveItems(); renderItems(); } }
 });
 
-/* Add to cart */
+/* Add to cart function */
 function addToCartBySKU(sku){
   const it = findItemBySKU(sku);
   if(!it){ alert('Item not found'); return; }
   if(it.stock<=0){ alert('Out of stock'); return; }
-  const cartItem = cart.find(c=>c.sku===sku);
-  if(cartItem){
-    if(cartItem.qty+1 > it.stock){ alert('Not enough stock'); return; }
-    cartItem.qty += 1;
-  } else {
-    cart.push({ sku: it.sku, name: it.name, price: it.price, qty: 1 });
-  }
+  const ci = cart.find(c=>c.sku===sku);
+  if(ci){ if(ci.qty+1 > it.stock){ alert('Not enough stock'); return; } ci.qty += 1; } else { cart.push({ sku: it.sku, name: it.name, price: it.price, qty: 1 }); }
   renderCart();
 }
 
-/* Cart actions */
+/* Cart controls */
 document.getElementById('cartArea').addEventListener('click', e=>{
   if(e.target.classList.contains('removeBtn')){
     const idx = parseInt(e.target.dataset.idx); cart.splice(idx,1); renderCart();
@@ -383,21 +376,17 @@ document.addEventListener('input', e=>{
   }
   if(e.target.id==='discount') renderCart();
 });
-document.getElementById('clearCart').addEventListener('click', ()=>{ cart=[]; renderCart(); });
+document.getElementById('clearCart').addEventListener('click', ()=>{ cart = []; renderCart(); });
 
-/* Checkout: save sale, reduce stock, show invoice (with customer & datetime) */
+/* Checkout: record sale, reduce stock, show invoice (exact design) */
 document.getElementById('checkoutBtn').addEventListener('click', ()=>{
   if(cart.length===0){ alert('Cart empty'); return; }
-  for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for '+c.name); return; } }
+  for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for ' + c.name); return; } }
   const subtotal = cart.reduce((s,c)=>s + c.qty*c.price, 0);
   const discount = parseFloat(document.getElementById('discount').value)||0;
   const total = Math.max(0, subtotal - discount);
 
-  const cust = {
-    name: (document.getElementById('custName').value || '').trim(),
-    phone: (document.getElementById('custPhone').value || '').trim(),
-    address: (document.getElementById('custAddress').value || '').trim()
-  };
+  const cust = { name: (document.getElementById('custName').value || '').trim(), phone: (document.getElementById('custPhone').value || '').trim(), address: (document.getElementById('custAddress').value || '').trim() };
 
   // reduce stock
   cart.forEach(c=>{ const it = findItemBySKU(c.sku); it.stock -= c.qty; });
@@ -411,32 +400,28 @@ document.getElementById('checkoutBtn').addEventListener('click', ()=>{
 
   cart = []; renderItems(); renderCart();
 
-  // clear customer fields
+  // clear customer inputs
   document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value='';
 });
 
-/* Invoice formatting and printing
-   We will render a fixed number of rows (e.g., 12) to preserve layout like the provided image.
+/* Invoice rendering — EXACT design preserved
+   Fills fixed rows to keep printed layout identical.
 */
 function showInvoice(sale){
-  document.getElementById('invoice').classList.remove('hidden');
-
-  // shop header placeholders (you can make these editable inputs later)
+  // header fields (left/proprietor and right/mobile left blank as in the design)
+  document.getElementById('shopOwnerLeft').innerText = ''; // leave blank or set proprietor
+  document.getElementById('shopMobileRight').innerText = ''; // leave blank or set mobile
+  // shop center fixed lines (match image)
   document.getElementById('invShopName').innerText = 'COMPUTER & ELECTRONICS';
   document.getElementById('invShopDesc').innerText = 'Deals in: Mobile, Mobile Accessories & Electrical Appliances';
   document.getElementById('invShopAddr').innerText = 'Near XYZ, Someplace (BIHAR)';
-  document.getElementById('shopOwnerLeft').innerText = 'Proprietor: YourName';
-  document.getElementById('shopMobileRight').innerText = '90XXXXXXX';
 
-  // customer name and date/time
   const cust = sale.customer || {};
   document.getElementById('printCustName').innerText = cust.name || '__________';
   document.getElementById('printDate').innerText = (new Date(sale.date)).toLocaleString();
 
-  // Render items into invItemsBody with S.No, Particulars, Qty, Rate, Amount
-  const tbody = document.getElementById('invItemsBody'); tbody.innerHTML='';
-
-  // choose fixed row count to match design — adjust as needed
+  // invoice rows
+  const tbody = document.getElementById('invItemsBody'); tbody.innerHTML = '';
   const FIXED_ROWS = 12;
   let idx = 0;
   for(const it of sale.items){
@@ -451,8 +436,6 @@ function showInvoice(sale){
     `;
     tbody.appendChild(tr);
   }
-
-  // fill remaining rows with empty rows to keep design
   for(let r = sale.items.length; r < FIXED_ROWS; r++){
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -465,18 +448,19 @@ function showInvoice(sale){
     tbody.appendChild(tr);
   }
 
-  // totals
   document.getElementById('invGrandTotal').innerText = fmt.format(sale.total);
-
-  // show invoice number (under header)
   document.getElementById('invNo').innerText = sale.invNo;
+
+  // show invoice container (visible for print)
+  document.getElementById('invoice').style.display = 'block';
+  // scroll invoice into view (optional)
+  setTimeout(()=> window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
 }
 
-/* print/close controls in the invoice are controlled by browser print and close button */
-document.getElementById('printInv')?.addEventListener('click', ()=> window.print());
-document.getElementById('closeInv')?.addEventListener('click', ()=> document.getElementById('invoice').classList.add('hidden'));
+/* close invoice: hide it (print button is browser) */
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ document.getElementById('invoice').style.display='none'; } });
 
-/* Stock modal */
+/* Stock modal logic */
 function openStockModal(sku){ document.getElementById('stockModal').classList.remove('hidden'); document.getElementById('stockSKU').innerText = sku; document.getElementById('stockQty').value = 1; currentEditingSKU = sku; }
 document.getElementById('closeStockModal').addEventListener('click', ()=>{ document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null; });
 document.getElementById('applyStock').addEventListener('click', ()=>{
@@ -563,13 +547,10 @@ function renderSales(){
   });
 }
 
-/* Utility escape for HTML injection safety */
-function escapeHtml(str){
-  if(!str) return '';
-  return String(str).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
-}
+/* Utility: escape HTML */
+function escapeHtml(str){ if(!str) return ''; return String(str).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; }); }
 
-/* Init */
+/* Init render */
 renderItems(); renderCart();
 
 /* Cleanup */
@@ -586,3 +567,4 @@ window.addEventListener('drop', e=>{
 
 </body>
 </html>
+
