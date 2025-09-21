@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Electronics Shop POS — Single File (Tailwind + Vanilla JS)</title>
+  <title>Electronics Shop POS — Invoice Template</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -11,21 +11,71 @@
   <!-- QR code generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <!-- QR code scanner (loads Html5Qrcode globally) -->
+  <!-- QR code scanner -->
 <!--   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script> -->
   <script src="qr.min.js"></script>
 
   <style>
-    /* Printable invoice helpers */
+    /* Print layout tuned to match provided design */
     @media print {
       body * { visibility: hidden; }
       #invoice, #invoice * { visibility: visible; }
-      #invoice { position: absolute; left: 0; top: 0; width: 100%; }
+      #invoice { position: absolute; left: 0; top: 0; width: 100%; padding: 12px; box-sizing: border-box; }
+      .no-print { display: none !important; }
+    }
+
+    /* Invoice page style (desktop view inside app) */
+    #invoicePaper {
+      width: 800px;            /* approximate fixed width similar to your image */
+      margin: 0 auto;
+      border: 1px solid #111;
+      padding: 12px;
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    /* thin grid lines like the example */
+    .inv-table td, .inv-table th {
+      border: 1px solid #111;
+      padding: 6px;
+      vertical-align: top;
+      font-size: 13px;
+    }
+    .inv-table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: fixed;
+    }
+    .inv-header-title {
+      font-weight: 800;
+      font-size: 20px;
+      letter-spacing: 0.6px;
+    }
+    .inv-shop-sub {
+      font-size: 12px;
+      color: #333;
+    }
+
+    /* Sizing for columns (to mimic the image proportions) */
+    .col-sno { width: 6%; text-align:center; }
+    .col-part { width: 58%; }
+    .col-qty { width: 12%; text-align:center; }
+    .col-rate { width: 12%; text-align:right; padding-right:10px; }
+    .col-amt { width: 12%; text-align:right; padding-right:10px; }
+
+    /* footer box */
+    .inv-footer-box {
+      border: 1px solid #111;
+      padding: 8px;
+      font-size: 12px;
+      margin-top: 8px;
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-slate-100 text-slate-800">
+
   <div class="max-w-6xl mx-auto p-4">
+
     <header class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Electronics Shop POS</h1>
       <div class="text-sm text-slate-600">Amounts in <span class="font-semibold">INR (₹)</span></div>
@@ -70,7 +120,7 @@
           <div id="qrScanner" class="mt-2"></div>
           <div id="scannerMsg" class="text-xs text-slate-500 mt-2"></div>
 
-          <!-- Customer fields for the bill -->
+          <!-- Customer fields for bill -->
           <div class="border rounded p-2 bg-slate-50">
             <div class="text-sm font-semibold mb-2">Customer details (optional)</div>
             <input id="custName" placeholder="Customer name" class="w-full p-2 border rounded mb-2" />
@@ -100,7 +150,7 @@
       </section>
     </main>
 
-    <!-- Modals and helpers -->
+    <!-- QR modal -->
     <div id="qrModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
       <div class="bg-white p-4 rounded max-w-md w-full">
         <h3 class="font-semibold">QR Code</h3>
@@ -112,6 +162,7 @@
       </div>
     </div>
 
+    <!-- Stock modal -->
     <div id="stockModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
       <div class="bg-white p-4 rounded max-w-md w-full">
         <h3 class="font-semibold">Update Stock</h3>
@@ -124,30 +175,64 @@
       </div>
     </div>
 
-    <!-- Invoice area (hidden, printable) -->
+    <!-- Invoice (matches provided design) -->
     <div id="invoice" class="hidden fixed inset-0 p-6 bg-white overflow-auto">
-      <div class="max-w-xl mx-auto">
-        <div class="flex justify-between items-start mb-4">
-          <div>
-            <h2 class="text-xl font-bold">Invoice</h2>
-            <div id="invShop">Electronics Shop</div>
-            <div id="invCust" class="text-sm text-slate-700 mt-1"></div>
-            <div id="invDateTime" class="text-sm text-slate-600 mt-1"></div>
-            <div id="invNo" class="text-sm text-slate-600 mt-1"></div>
+      <div id="invoicePaper" class="mx-auto">
+
+        <!-- header: left contact, center shop title, right mobile -->
+        <div class="flex justify-between items-start mb-2">
+          <div style="width:33%; font-size:12px;">Prop: <span id="shopOwnerLeft">-</span></div>
+          <div style="width:34%; text-align:center;">
+            <div class="inv-header-title" id="invShopName">COMPUTER & ELECTRONICS</div>
+            <div class="inv-shop-sub" id="invShopDesc">Deals in: Mobile, Mobile Accessories & Electrical Appliances</div>
+            <div class="inv-shop-sub" id="invShopAddr">Near XYZ, Someplace (BIHAR)</div>
           </div>
-          <div id="invTotalAmt" class="text-right text-lg font-semibold"></div>
+          <div style="width:33%; text-align:right; font-size:12px;">Mob: <span id="shopMobileRight">-</span></div>
         </div>
-        <table class="w-full mb-4 text-sm">
-          <thead class="text-left text-slate-600"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Sub</th></tr></thead>
-          <tbody id="invBody"></tbody>
+
+        <!-- Name and Date row -->
+        <div class="flex justify-between items-center mb-2">
+          <div style="width:65%;"><strong>Name</strong> &nbsp; <span id="printCustName">__________</span></div>
+          <div style="width:35%; text-align:right;"><strong>Date</strong> &nbsp; <span id="printDate">__________</span></div>
+        </div>
+
+        <!-- Items table -->
+        <table class="inv-table mb-2">
+          <thead>
+            <tr>
+              <th class="col-sno">S.No</th>
+              <th class="col-part">Particulars</th>
+              <th class="col-qty">Qnty</th>
+              <th class="col-rate">Rate</th>
+              <th class="col-amt">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="invItemsBody">
+            <!-- rows added by JS -->
+          </tbody>
+
+          <!-- total row with separate border -->
+          <tfoot>
+            <tr>
+              <td colspan="4" style="text-align:center; font-weight:700; padding:10px;">TOTAL</td>
+              <td style="text-align:right; font-weight:700; padding-right:10px;" id="invGrandTotal">₹0.00</td>
+            </tr>
+          </tfoot>
         </table>
-        <div class="text-right">Subtotal: <span id="invSub"></span></div>
-        <div class="text-right">Discount: <span id="invDisc"></span></div>
-        <div class="text-right text-lg font-bold">Total: <span id="invTotal"></span></div>
-        <div class="mt-6 flex gap-2 justify-end"><button id="printInv" class="px-3 py-2 bg-blue-600 text-white rounded">Print</button><button id="closeInv" class="px-3 py-2 bg-gray-200 rounded">Close</button></div>
+
+        <!-- footer notes -->
+        <div class="inv-footer-box">
+          <ol style="padding-left:16px; margin:0;">
+            <li>हैण्डसेट की गारंटी सर्विस सेंटर से ही मिलेगी।</li>
+            <li>विक्रय पर्ची के बिना समान की कोई जमानत/गैर ज़िम्मेदारी नहीं होगी।</li>
+            <li>बिक्री हुआ समान वापस नहीं होगा।</li>
+          </ol>
+        </div>
+
       </div>
     </div>
 
+    <!-- Sales modal -->
     <div id="salesModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
       <div class="bg-white p-4 rounded max-w-2xl w-full">
         <h3 class="font-semibold">Sales History</h3>
@@ -156,11 +241,11 @@
       </div>
     </div>
 
-    <footer class="mt-6 text-slate-500 text-sm">Built with Tailwind + Vanilla JS — data saved locally in your browser (localStorage). Export/backup JSON to move between devices.</footer>
+    <footer class="mt-6 text-slate-500 text-sm no-print">Built with Tailwind + Vanilla JS — data saved locally in your browser (localStorage).</footer>
   </div>
 
 <script>
-/* ------------------ POS JavaScript (customer fields + date/time) ------------------ */
+/* ------------------ POS JavaScript (invoice layout) ------------------ */
 const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
 let items = JSON.parse(localStorage.getItem('pos_items') || '[]');
@@ -170,23 +255,22 @@ let currentEditingSKU = null;
 let html5QrcodeScanner = null;
 let scannerActive = false;
 
-function saveItems() { localStorage.setItem('pos_items', JSON.stringify(items)); }
-function saveSales() { localStorage.setItem('pos_sales', JSON.stringify(sales)); }
-function genSKU(name) {
+/* Helpers */
+function saveItems(){ localStorage.setItem('pos_items', JSON.stringify(items)); }
+function saveSales(){ localStorage.setItem('pos_sales', JSON.stringify(sales)); }
+function genSKU(name){
   const base = name.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0,6) || 'ITEM';
   return base + Date.now().toString().slice(-5);
 }
-function findItemBySKU(sku){ return items.find(i => i.sku === sku); }
+function findItemBySKU(sku){ return items.find(i=> i.sku===sku); }
 
-/* Rendering */
+/* Render items list in left panel */
 function renderItems(filter=''){
-  const list = document.getElementById('itemsList');
-  list.innerHTML = '';
+  const list = document.getElementById('itemsList'); list.innerHTML='';
   const filtered = items.filter(i => (i.name + ' ' + i.sku + ' ' + (i.desc||'')).toLowerCase().includes(filter.toLowerCase()));
-  if(filtered.length===0){ list.innerHTML = '<div class="p-3 text-slate-500">No items yet</div>'; return; }
-  filtered.forEach(i =>{
-    const row = document.createElement('div');
-    row.className = 'p-2 bg-white rounded mb-2 flex items-center justify-between shadow-sm';
+  if(filtered.length===0){ list.innerHTML='<div class="p-3 text-slate-500">No items yet</div>'; return; }
+  filtered.forEach(i=>{
+    const row = document.createElement('div'); row.className='p-2 bg-white rounded mb-2 flex items-center justify-between shadow-sm';
     row.innerHTML = `
       <div>
         <div class="font-semibold">${i.name} <span class="text-xs text-slate-500">[${i.sku}]</span></div>
@@ -208,14 +292,12 @@ function renderItems(filter=''){
   });
 }
 
+/* Cart rendering */
 function renderCart(){
-  const body = document.getElementById('cartBody');
-  body.innerHTML='';
+  const body = document.getElementById('cartBody'); body.innerHTML='';
   let subtotal = 0;
   cart.forEach((c,idx)=>{
-    const tr = document.createElement('tr');
-    const sub = c.qty * c.price;
-    subtotal += sub;
+    const tr = document.createElement('tr'); const sub = c.qty * c.price; subtotal += sub;
     tr.innerHTML = `
       <td>${c.name}</td>
       <td><input data-idx="${idx}" class="w-16 p-1 border rounded text-sm qtyInput" type="number" min="1" value="${c.qty}"/></td>
@@ -231,8 +313,8 @@ function renderCart(){
   document.getElementById('total').innerText = fmt.format(total);
 }
 
-/* Add item */
-document.getElementById('itemForm').addEventListener('submit', e =>{
+/* Add item form */
+document.getElementById('itemForm').addEventListener('submit', e=>{
   e.preventDefault();
   const name = document.getElementById('itemName').value.trim();
   const price = parseFloat(document.getElementById('itemPrice').value) || 0;
@@ -253,8 +335,6 @@ document.getElementById('itemForm').addEventListener('submit', e =>{
 });
 
 document.getElementById('clearForm').addEventListener('click', ()=> document.getElementById('itemForm').reset());
-
-/* Export JSON */
 document.getElementById('exportBtn').addEventListener('click', ()=>{
   const data = { items, sales };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -262,24 +342,32 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   const a = document.createElement('a'); a.href=url; a.download='pos-backup.json'; a.click();
   URL.revokeObjectURL(url);
 });
+document.getElementById('search').addEventListener('input', e=> renderItems(e.target.value));
 
-/* Search */
-document.getElementById('search').addEventListener('input', e => renderItems(e.target.value));
-
-/* Item list buttons (delegation) */
+/* Items list delegation */
 document.getElementById('itemsList').addEventListener('click', e=>{
   const btn = e.target.closest('button'); if(!btn) return;
   const action = btn.dataset.action; const sku = btn.dataset.sku;
-  if(action === 'add'){ addToCartBySKU(sku); }
-  else if(action === 'stock'){ openStockModal(sku); }
-  else if(action === 'qr'){ showQRForSKU(sku); }
-  else if(action === 'del'){ if(confirm('Delete item?')){ items = items.filter(i=>i.sku!==sku); saveItems(); renderItems(); } }
+  if(action==='add'){ addToCartBySKU(sku); }
+  else if(action==='stock'){ openStockModal(sku); }
+  else if(action==='qr'){ showQRForSKU(sku); }
+  else if(action==='del'){ if(confirm('Delete item?')){ items = items.filter(i=>i.sku!==sku); saveItems(); renderItems(); } }
 });
 
-function addToCartBySKU(sku){ const it = findItemBySKU(sku); if(!it){ alert('Item not found'); return; } if(it.stock<=0){ alert('Out of stock'); return; }
+/* Add to cart */
+function addToCartBySKU(sku){
+  const it = findItemBySKU(sku);
+  if(!it){ alert('Item not found'); return; }
+  if(it.stock<=0){ alert('Out of stock'); return; }
   const cartItem = cart.find(c=>c.sku===sku);
-  if(cartItem){ if(cartItem.qty+1 > it.stock){ alert('Not enough stock'); return; } cartItem.qty +=1; } else { cart.push({ sku: it.sku, name: it.name, price: it.price, qty: 1 }); }
-  renderCart(); }
+  if(cartItem){
+    if(cartItem.qty+1 > it.stock){ alert('Not enough stock'); return; }
+    cartItem.qty += 1;
+  } else {
+    cart.push({ sku: it.sku, name: it.name, price: it.price, qty: 1 });
+  }
+  renderCart();
+}
 
 /* Cart actions */
 document.getElementById('cartArea').addEventListener('click', e=>{
@@ -287,8 +375,6 @@ document.getElementById('cartArea').addEventListener('click', e=>{
     const idx = parseInt(e.target.dataset.idx); cart.splice(idx,1); renderCart();
   }
 });
-
-/* Quantity change and discount */
 document.addEventListener('input', e=>{
   if(e.target.classList.contains('qtyInput')){
     const idx = parseInt(e.target.dataset.idx); const v = parseInt(e.target.value)||1; const it = findItemBySKU(cart[idx].sku);
@@ -297,19 +383,16 @@ document.addEventListener('input', e=>{
   }
   if(e.target.id==='discount') renderCart();
 });
+document.getElementById('clearCart').addEventListener('click', ()=>{ cart=[]; renderCart(); });
 
-/* Clear cart */
-document.getElementById('clearCart').addEventListener('click', ()=>{ cart = []; renderCart(); });
-
-/* Checkout (includes customer info and date/time) */
+/* Checkout: save sale, reduce stock, show invoice (with customer & datetime) */
 document.getElementById('checkoutBtn').addEventListener('click', ()=>{
   if(cart.length===0){ alert('Cart empty'); return; }
-  for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for ' + c.name); return; } }
+  for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for '+c.name); return; } }
   const subtotal = cart.reduce((s,c)=>s + c.qty*c.price, 0);
   const discount = parseFloat(document.getElementById('discount').value)||0;
   const total = Math.max(0, subtotal - discount);
 
-  // collect customer info
   const cust = {
     name: (document.getElementById('custName').value || '').trim(),
     phone: (document.getElementById('custPhone').value || '').trim(),
@@ -323,48 +406,81 @@ document.getElementById('checkoutBtn').addEventListener('click', ()=>{
   const invNo = 'INV' + Date.now();
   const sale = { invNo, date: new Date().toISOString(), items: JSON.parse(JSON.stringify(cart)), subtotal, discount, total, customer: cust };
   sales.push(sale); saveSales();
+
   showInvoice(sale);
+
   cart = []; renderItems(); renderCart();
+
   // clear customer fields
-  document.getElementById('custName').value = '';
-  document.getElementById('custPhone').value = '';
-  document.getElementById('custAddress').value = '';
+  document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value='';
 });
 
-function formatDateTime(iso){
-  const d = new Date(iso);
-  // show date and time explicitly
-  return d.toLocaleString();
-}
-
+/* Invoice formatting and printing
+   We will render a fixed number of rows (e.g., 12) to preserve layout like the provided image.
+*/
 function showInvoice(sale){
   document.getElementById('invoice').classList.remove('hidden');
+
+  // shop header placeholders (you can make these editable inputs later)
+  document.getElementById('invShopName').innerText = 'COMPUTER & ELECTRONICS';
+  document.getElementById('invShopDesc').innerText = 'Deals in: Mobile, Mobile Accessories & Electrical Appliances';
+  document.getElementById('invShopAddr').innerText = 'Near XYZ, Someplace (BIHAR)';
+  document.getElementById('shopOwnerLeft').innerText = 'Proprietor: YourName';
+  document.getElementById('shopMobileRight').innerText = '90XXXXXXX';
+
+  // customer name and date/time
   const cust = sale.customer || {};
-  const custText = [];
-  if(cust.name) custText.push(cust.name);
-  if(cust.phone) custText.push('Phone: ' + cust.phone);
-  if(cust.address) custText.push(cust.address);
-  document.getElementById('invCust').innerText = custText.join(' • ');
-  document.getElementById('invDateTime').innerText = 'Sold on: ' + formatDateTime(sale.date);
+  document.getElementById('printCustName').innerText = cust.name || '__________';
+  document.getElementById('printDate').innerText = (new Date(sale.date)).toLocaleString();
+
+  // Render items into invItemsBody with S.No, Particulars, Qty, Rate, Amount
+  const tbody = document.getElementById('invItemsBody'); tbody.innerHTML='';
+
+  // choose fixed row count to match design — adjust as needed
+  const FIXED_ROWS = 12;
+  let idx = 0;
+  for(const it of sale.items){
+    idx++;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-sno" style="text-align:center;">${idx}</td>
+      <td class="col-part">${escapeHtml(it.name)}</td>
+      <td class="col-qty">${it.qty}</td>
+      <td class="col-rate">${fmt.format(it.price)}</td>
+      <td class="col-amt">${fmt.format(it.qty * it.price)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // fill remaining rows with empty rows to keep design
+  for(let r = sale.items.length; r < FIXED_ROWS; r++){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-sno" style="text-align:center;">&nbsp;</td>
+      <td class="col-part">&nbsp;</td>
+      <td class="col-qty">&nbsp;</td>
+      <td class="col-rate">&nbsp;</td>
+      <td class="col-amt">&nbsp;</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // totals
+  document.getElementById('invGrandTotal').innerText = fmt.format(sale.total);
+
+  // show invoice number (under header)
   document.getElementById('invNo').innerText = sale.invNo;
-  document.getElementById('invBody').innerHTML = '';
-  sale.items.forEach(it=>{
-    const tr = document.createElement('tr'); tr.innerHTML = `<td>${it.name}</td><td>${it.qty}</td><td>${fmt.format(it.price)}</td><td>${fmt.format(it.qty*it.price)}</td>`; document.getElementById('invBody').appendChild(tr);
-  });
-  document.getElementById('invSub').innerText = fmt.format(sale.subtotal);
-  document.getElementById('invDisc').innerText = fmt.format(sale.discount);
-  document.getElementById('invTotal').innerText = fmt.format(sale.total);
-  document.getElementById('invTotalAmt').innerText = fmt.format(sale.total);
 }
 
-document.getElementById('printInv').addEventListener('click', ()=>{ window.print(); });
-document.getElementById('closeInv').addEventListener('click', ()=>{ document.getElementById('invoice').classList.add('hidden'); });
+/* print/close controls in the invoice are controlled by browser print and close button */
+document.getElementById('printInv')?.addEventListener('click', ()=> window.print());
+document.getElementById('closeInv')?.addEventListener('click', ()=> document.getElementById('invoice').classList.add('hidden'));
 
 /* Stock modal */
 function openStockModal(sku){ document.getElementById('stockModal').classList.remove('hidden'); document.getElementById('stockSKU').innerText = sku; document.getElementById('stockQty').value = 1; currentEditingSKU = sku; }
 document.getElementById('closeStockModal').addEventListener('click', ()=>{ document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null; });
 document.getElementById('applyStock').addEventListener('click', ()=>{
-  const qty = parseInt(document.getElementById('stockQty').value)||0; const sku = currentEditingSKU; const it = findItemBySKU(sku);
+  const qty = parseInt(document.getElementById('stockQty').value) || 0; const sku = currentEditingSKU; const it = findItemBySKU(sku);
   if(!it) return; it.stock += qty; saveItems(); renderItems(); document.getElementById('stockModal').classList.add('hidden'); currentEditingSKU = null;
 });
 
@@ -377,9 +493,7 @@ function showQRForSKU(sku){
   new QRCode(qDiv, { text: payload, width: 220, height: 220 });
   document.getElementById('qrText').innerText = payload;
   setTimeout(()=>{
-    const img = qDiv.querySelector('img');
-    const canvas = qDiv.querySelector('canvas');
-    const downloadBtn = document.getElementById('downloadQr');
+    const img = qDiv.querySelector('img'); const canvas = qDiv.querySelector('canvas'); const downloadBtn = document.getElementById('downloadQr');
     downloadBtn.onclick = ()=>{
       try{
         let url;
@@ -393,87 +507,72 @@ function showQRForSKU(sku){
 }
 document.getElementById('closeQrModal').addEventListener('click', ()=> document.getElementById('qrModal').classList.add('hidden'));
 
-/* Improved Scanner (Html5Qrcode) */
+/* Scanner (Html5Qrcode) */
 async function startScanner(){
   if(scannerActive) return;
-  const scannerMsg = document.getElementById('scannerMsg');
-  scannerMsg.innerText = 'Starting camera...';
+  const scannerMsg = document.getElementById('scannerMsg'); scannerMsg.innerText = 'Starting camera...';
   const container = document.getElementById('qrScanner'); container.innerHTML = '<div id="reader" style="width:100%"></div>';
   try{
     if(typeof Html5Qrcode === 'undefined'){ scannerMsg.innerText = 'Scanner library not loaded.'; console.error('Html5Qrcode not defined'); return; }
-
     const cameras = await Html5Qrcode.getCameras();
     if(!cameras || cameras.length===0){ scannerMsg.innerText = 'No camera found on this device.'; return; }
     let cameraId = cameras[0].id;
     const rear = cameras.find(c => /back|rear|environment/i.test(c.label || ''));
     if(rear) cameraId = rear.id;
-
     html5QrcodeScanner = new Html5Qrcode('reader');
-    document.getElementById('stopScanner').classList.remove('hidden');
-    scannerActive = true;
-
-    await html5QrcodeScanner.start(
-      cameraId,
-      { fps: 10, qrbox: 250 },
-      qrCodeMessage => {
-        try{
-          let parsed = null;
-          try{ parsed = JSON.parse(qrCodeMessage); }catch(e){}
-          if(parsed && parsed.type==='pos-item' && parsed.sku){ addToCartBySKU(parsed.sku); }
-          else {
-            const possibleSKU = qrCodeMessage.trim();
-            const it = findItemBySKU(possibleSKU);
-            if(it) addToCartBySKU(possibleSKU);
-            else alert('Scanned: ' + qrCodeMessage + '
-(Scanned data did not match any item)');
-          }
-          stopScanner();
-        }catch(err){ console.error('Scan handling error', err); }
-      },
-      errorMessage => {
-        // per-frame scan error (ignored)
-      }
-    );
+    document.getElementById('stopScanner').classList.remove('hidden'); scannerActive = true;
+    await html5QrcodeScanner.start(cameraId, { fps: 10, qrbox: 250 }, qrCodeMessage=>{
+      try{
+        let parsed = null; try{ parsed = JSON.parse(qrCodeMessage); }catch(e){}
+        if(parsed && parsed.type==='pos-item' && parsed.sku){ addToCartBySKU(parsed.sku); }
+        else {
+          const possibleSKU = qrCodeMessage.trim(); const it = findItemBySKU(possibleSKU);
+          if(it) addToCartBySKU(possibleSKU);
+          else alert('Scanned: ' + qrCodeMessage + '\n(Scanned data did not match any item)');
+        }
+        stopScanner();
+      }catch(err){ console.error('Scan handling error', err); }
+    }, errorMessage=>{ /* ignore frame errors */ });
     scannerMsg.innerText = 'Scanning — point camera at item QR.';
-  }catch(err){
-    scannerMsg.innerText = 'Unable to start scanner: ' + err;
-    console.error(err);
-  }
+  }catch(err){ scannerMsg.innerText = 'Unable to start scanner: ' + err; console.error(err); }
 }
-
 async function stopScanner(){
   const scannerMsg = document.getElementById('scannerMsg');
   if(html5QrcodeScanner && scannerActive){
     try{ await html5QrcodeScanner.stop(); html5QrcodeScanner.clear(); }catch(e){ console.warn('stop error', e); }
   }
-  document.getElementById('qrScanner').innerHTML = '';
-  document.getElementById('stopScanner').classList.add('hidden');
-  scannerActive = false;
-  scannerMsg.innerText = '';
+  document.getElementById('qrScanner').innerHTML = ''; document.getElementById('stopScanner').classList.add('hidden'); scannerActive = false; scannerMsg.innerText = '';
 }
-
-document.getElementById('openScanner').addEventListener('click', ()=>{ startScanner(); });
-document.getElementById('stopScanner').addEventListener('click', ()=>{ stopScanner(); });
+document.getElementById('openScanner').addEventListener('click', ()=> startScanner());
+document.getElementById('stopScanner').addEventListener('click', ()=> stopScanner());
 
 /* Sales history */
 document.getElementById('viewSales').addEventListener('click', ()=>{
-  document.getElementById('salesModal').classList.remove('hidden'); renderSales(); });
+  document.getElementById('salesModal').classList.remove('hidden'); renderSales();
+});
 document.getElementById('closeSales').addEventListener('click', ()=> document.getElementById('salesModal').classList.add('hidden'));
-function renderSales(){ const holder = document.getElementById('salesList'); holder.innerHTML=''; if(sales.length===0){ holder.innerHTML='<div class="p-3 text-slate-500">No sales yet</div>'; return; }
+function renderSales(){
+  const holder = document.getElementById('salesList'); holder.innerHTML='';
+  if(sales.length===0){ holder.innerHTML='<div class="p-3 text-slate-500">No sales yet</div>'; return; }
   sales.slice().reverse().forEach(s=>{
     const d = new Date(s.date);
     const div = document.createElement('div'); div.className='p-2 border-b';
     div.innerHTML = `<div class="flex justify-between"><div><strong>${s.invNo}</strong> • ${d.toLocaleString()}</div><div>${fmt.format(s.total)}</div></div>`;
     const btn = document.createElement('button'); btn.className='mt-2 px-2 py-1 bg-gray-200 rounded'; btn.innerText='View'; btn.addEventListener('click', ()=> showInvoice(s));
-    div.appendChild(btn);
-    holder.appendChild(div);
+    div.appendChild(btn); holder.appendChild(div);
   });
+}
+
+/* Utility escape for HTML injection safety */
+function escapeHtml(str){
+  if(!str) return '';
+  return String(str).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
 }
 
 /* Init */
 renderItems(); renderCart();
 
-/* Cleanup on unload */
+/* Cleanup */
 window.addEventListener('beforeunload', ()=>{ if(html5QrcodeScanner && scannerActive) html5QrcodeScanner.stop().catch(()=>{}); });
 
 /* Drag & drop import */
@@ -484,5 +583,6 @@ window.addEventListener('drop', e=>{
   }; r.readAsText(f);
 });
 </script>
+
 </body>
 </html>
