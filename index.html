@@ -12,7 +12,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <!-- QR code scanner (loads Html5Qrcode globally) -->
-<!--   <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script> -->
+<!--   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script> -->
   <script src="qr.min.js"></script>
 
   <style>
@@ -61,7 +61,7 @@
       <section class="bg-white rounded-lg p-4 shadow">
         <h2 class="font-semibold mb-3">POS — Cart</h2>
 
-        <div class="mb-2">
+        <div class="mb-2 space-y-3">
           <div class="flex gap-2">
             <button id="openScanner" class="px-3 py-2 bg-indigo-600 text-white rounded">Scan QR (use Camera)</button>
             <button id="stopScanner" class="px-3 py-2 bg-red-500 text-white rounded hidden">Stop Scanner</button>
@@ -69,9 +69,17 @@
           </div>
           <div id="qrScanner" class="mt-2"></div>
           <div id="scannerMsg" class="text-xs text-slate-500 mt-2"></div>
+
+          <!-- Customer fields for the bill -->
+          <div class="border rounded p-2 bg-slate-50">
+            <div class="text-sm font-semibold mb-2">Customer details (optional)</div>
+            <input id="custName" placeholder="Customer name" class="w-full p-2 border rounded mb-2" />
+            <input id="custPhone" placeholder="Phone or WhatsApp" class="w-full p-2 border rounded mb-2" />
+            <input id="custAddress" placeholder="Address (for record)" class="w-full p-2 border rounded" />
+          </div>
         </div>
 
-        <div id="cartArea" class="border rounded p-2 bg-slate-50">
+        <div id="cartArea" class="border rounded p-2 bg-slate-50 mt-3">
           <table class="w-full text-sm">
             <thead class="text-left text-slate-600">
               <tr><th>Item</th><th>Qty</th><th>Price</th><th>Sub</th><th></th></tr>
@@ -119,12 +127,13 @@
     <!-- Invoice area (hidden, printable) -->
     <div id="invoice" class="hidden fixed inset-0 p-6 bg-white overflow-auto">
       <div class="max-w-xl mx-auto">
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex justify-between items-start mb-4">
           <div>
             <h2 class="text-xl font-bold">Invoice</h2>
             <div id="invShop">Electronics Shop</div>
-            <div id="invDate"></div>
-            <div id="invNo"></div>
+            <div id="invCust" class="text-sm text-slate-700 mt-1"></div>
+            <div id="invDateTime" class="text-sm text-slate-600 mt-1"></div>
+            <div id="invNo" class="text-sm text-slate-600 mt-1"></div>
           </div>
           <div id="invTotalAmt" class="text-right text-lg font-semibold"></div>
         </div>
@@ -151,8 +160,7 @@
   </div>
 
 <script>
-/* ------------------ POS JavaScript (complete) ------------------ */
-/* Data keys: pos_items, pos_sales */
+/* ------------------ POS JavaScript (customer fields + date/time) ------------------ */
 const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
 
 let items = JSON.parse(localStorage.getItem('pos_items') || '[]');
@@ -293,25 +301,51 @@ document.addEventListener('input', e=>{
 /* Clear cart */
 document.getElementById('clearCart').addEventListener('click', ()=>{ cart = []; renderCart(); });
 
-/* Checkout */
+/* Checkout (includes customer info and date/time) */
 document.getElementById('checkoutBtn').addEventListener('click', ()=>{
   if(cart.length===0){ alert('Cart empty'); return; }
   for(const c of cart){ const it = findItemBySKU(c.sku); if(!it || c.qty>it.stock){ alert('Insufficient stock for ' + c.name); return; } }
   const subtotal = cart.reduce((s,c)=>s + c.qty*c.price, 0);
   const discount = parseFloat(document.getElementById('discount').value)||0;
   const total = Math.max(0, subtotal - discount);
+
+  // collect customer info
+  const cust = {
+    name: (document.getElementById('custName').value || '').trim(),
+    phone: (document.getElementById('custPhone').value || '').trim(),
+    address: (document.getElementById('custAddress').value || '').trim()
+  };
+
+  // reduce stock
   cart.forEach(c=>{ const it = findItemBySKU(c.sku); it.stock -= c.qty; });
   saveItems();
+
   const invNo = 'INV' + Date.now();
-  const sale = { invNo, date: new Date().toISOString(), items: JSON.parse(JSON.stringify(cart)), subtotal, discount, total };
+  const sale = { invNo, date: new Date().toISOString(), items: JSON.parse(JSON.stringify(cart)), subtotal, discount, total, customer: cust };
   sales.push(sale); saveSales();
   showInvoice(sale);
   cart = []; renderItems(); renderCart();
+  // clear customer fields
+  document.getElementById('custName').value = '';
+  document.getElementById('custPhone').value = '';
+  document.getElementById('custAddress').value = '';
 });
+
+function formatDateTime(iso){
+  const d = new Date(iso);
+  // show date and time explicitly
+  return d.toLocaleString();
+}
 
 function showInvoice(sale){
   document.getElementById('invoice').classList.remove('hidden');
-  document.getElementById('invDate').innerText = new Date(sale.date).toLocaleString();
+  const cust = sale.customer || {};
+  const custText = [];
+  if(cust.name) custText.push(cust.name);
+  if(cust.phone) custText.push('Phone: ' + cust.phone);
+  if(cust.address) custText.push(cust.address);
+  document.getElementById('invCust').innerText = custText.join(' • ');
+  document.getElementById('invDateTime').innerText = 'Sold on: ' + formatDateTime(sale.date);
   document.getElementById('invNo').innerText = sale.invNo;
   document.getElementById('invBody').innerHTML = '';
   sale.items.forEach(it=>{
@@ -366,12 +400,10 @@ async function startScanner(){
   scannerMsg.innerText = 'Starting camera...';
   const container = document.getElementById('qrScanner'); container.innerHTML = '<div id="reader" style="width:100%"></div>';
   try{
-    // Ensure Html5Qrcode is available
     if(typeof Html5Qrcode === 'undefined'){ scannerMsg.innerText = 'Scanner library not loaded.'; console.error('Html5Qrcode not defined'); return; }
 
     const cameras = await Html5Qrcode.getCameras();
     if(!cameras || cameras.length===0){ scannerMsg.innerText = 'No camera found on this device.'; return; }
-    // prefer a rear camera if available
     let cameraId = cameras[0].id;
     const rear = cameras.find(c => /back|rear|environment/i.test(c.label || ''));
     if(rear) cameraId = rear.id;
@@ -384,7 +416,6 @@ async function startScanner(){
       cameraId,
       { fps: 10, qrbox: 250 },
       qrCodeMessage => {
-        // handle successful scan
         try{
           let parsed = null;
           try{ parsed = JSON.parse(qrCodeMessage); }catch(e){}
@@ -393,7 +424,8 @@ async function startScanner(){
             const possibleSKU = qrCodeMessage.trim();
             const it = findItemBySKU(possibleSKU);
             if(it) addToCartBySKU(possibleSKU);
-            else alert('Scanned: ' + qrCodeMessage + '\n(Scanned data did not match any item)');
+            else alert('Scanned: ' + qrCodeMessage + '
+(Scanned data did not match any item)');
           }
           stopScanner();
         }catch(err){ console.error('Scan handling error', err); }
